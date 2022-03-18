@@ -10,7 +10,8 @@ class NDiffs:
     file_path = "/Users/nicholaskrute/Documents/SPAC_Price_by_diffs/"
     headers = ["Issuer Name", "Common Ticket", "Remaining Life (months)", "Previous Closing Price",
                "Cash per Share in Trust", "Exp Date", "Ann. YTM - Last Reported", "IPO Size ($m)"]
-    spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_", "SPAC_Num_Shares_", "SPAC_IPO_Size_"]
+    spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_", "SPAC_Cash_in_Trust_", "SPAC_IPO_Size_",
+                    "SPAC_Num_Shares_"]
     start_date = pd.to_datetime("5/1/2022")  # taken from the original doc in sheet2
     end_date = pd.to_datetime("5/1/2024")
     initial_investment = 100000
@@ -104,13 +105,12 @@ class NDiffs:
             ranked_to_go_through = dataset[dataset.index == row[0]]
             row_in_list = list(row[1].values)
             for ranked in ranked_to_go_through.iterrows():
-                #print("HERE")
-                #print(list(ranked)[1][0])
                 row_in_list.append(list(ranked)[1][0])
                 row_in_list.append(list(ranked)[1][1])
                 row_in_list.append(list(ranked)[1][3])
                 row_in_list.append(list(ranked)[1][4])
                 row_in_list.append(list(ranked)[1][7])
+                row_in_list.append(list(ranked)[1][11])
             single_rows.append(row_in_list)
         column_names = self.generate_column_names(n)
         average_dataset = pd.DataFrame(np.row_stack(single_rows), index=date_range, columns=column_names)
@@ -123,9 +123,13 @@ class NDiffs:
                 column_list.append(str(col+str(n+1)))
         return column_list
 
-    # TODO
     def extend_dataset(self, dataset, end_date):
-        pass
+        date_range = pd.date_range(start=dataset.index[0],
+                                   end=end_date, freq="MS")
+        reindexed_data = dataset.reindex(date_range)
+        self.forward_fill_missing_data(reindexed_data)
+        return  reindexed_data
+
 
     def validate_and_reset_index(self, old_dataset, dataset, n):
         is_valid = self.validate_length_of_index(old_dataset, dataset)
@@ -168,6 +172,8 @@ ranked_data = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month
 highest_prices = ndiffs.only_keep_top_n_spacs(ranked_data, num_spacs)
 
 single_row = ndiffs.generate_single_row_from_top_n_spacs(highest_prices, num_spacs)
+single_row = ndiffs.extend_dataset(single_row, NDiffs.end_date)
+
 
 ndiffs.write_data(ranked_data, "".join([ndiffs.file_path, "full_out.csv"]))
 ndiffs.write_data(highest_prices, "".join([ndiffs.file_path, "out_highest_prices.csv"]))
