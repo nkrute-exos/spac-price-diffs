@@ -19,7 +19,7 @@ class NDiffs:
     @staticmethod
     def read_and_process_in_data(file_name):
         spac_data = pd.read_excel(file_name)
-        spac_data = spac_data.iloc[6:, 1:]
+        spac_data = spac_data.iloc[6:, 1:]  # want to figure out how to replace this
         spac_data.columns = NDiffs.headers
         spac_data = spac_data.reset_index(drop=True)
         spac_data["Exp Date"] = pd.to_datetime(spac_data["Exp Date"]) + pd.offsets.MonthBegin(1)
@@ -105,12 +105,12 @@ class NDiffs:
             ranked_to_go_through = dataset[dataset.index == row[0]]
             row_in_list = list(row[1].values)
             for ranked in ranked_to_go_through.iterrows():
-                row_in_list.append(list(ranked)[1][0])
-                row_in_list.append(list(ranked)[1][1])
-                row_in_list.append(list(ranked)[1][3])
-                row_in_list.append(list(ranked)[1][4])
-                row_in_list.append(list(ranked)[1][7])
-                row_in_list.append(list(ranked)[1][11])
+                row_in_list.append(list(ranked)[1][0])  # issuer
+                row_in_list.append(list(ranked)[1][1])  # ticker
+                row_in_list.append(list(ranked)[1][3])  # price
+                row_in_list.append(list(ranked)[1][4])  # cash in trust
+                row_in_list.append(list(ranked)[1][7])  # IPO size
+                row_in_list.append(list(ranked)[1][11])  # number of shares
             single_rows.append(row_in_list)
         column_names = self.generate_column_names(n)
         average_dataset = pd.DataFrame(np.row_stack(single_rows), index=date_range, columns=column_names)
@@ -128,8 +128,7 @@ class NDiffs:
                                    end=end_date, freq="MS")
         reindexed_data = dataset.reindex(date_range)
         self.forward_fill_missing_data(reindexed_data)
-        return  reindexed_data
-
+        return reindexed_data
 
     def validate_and_reset_index(self, old_dataset, dataset, n):
         is_valid = self.validate_length_of_index(old_dataset, dataset)
@@ -162,19 +161,19 @@ class NDiffs:
         dataset.to_csv(file_output_path)
 
 
-num_spacs = 5
-ndiffs = NDiffs()
-returned_spac_data = ndiffs.read_and_process_in_data("".join([ndiffs.file_path,
-                                                     "2022_03_16 - SPAC reported yields.xlsx"]))
-ndiffs.write_data(returned_spac_data, "".join([ndiffs.file_path, "full_out.csv"]))
+if __name__ == "__main__":
+    num_spacs = 3
+    ndiffs = NDiffs()
+    returned_spac_data = ndiffs.read_and_process_in_data("".join([ndiffs.file_path,
+                                                         "2022_03_16 - SPAC reported yields.xlsx"]))
+    ndiffs.write_data(returned_spac_data, "".join([ndiffs.file_path, "full_out.csv"]))
 
-ranked_data = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month_year_cutoff="05-2022")
-highest_prices = ndiffs.only_keep_top_n_spacs(ranked_data, num_spacs)
+    ranked_data = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month_year_cutoff="05-2022")
+    highest_prices = ndiffs.only_keep_top_n_spacs(ranked_data, num_spacs)
 
-single_row = ndiffs.generate_single_row_from_top_n_spacs(highest_prices, num_spacs)
-single_row = ndiffs.extend_dataset(single_row, NDiffs.end_date)
+    single_row = ndiffs.generate_single_row_from_top_n_spacs(highest_prices, num_spacs)
+    single_row = ndiffs.extend_dataset(single_row, NDiffs.end_date)
 
-
-ndiffs.write_data(ranked_data, "".join([ndiffs.file_path, "full_out.csv"]))
-ndiffs.write_data(highest_prices, "".join([ndiffs.file_path, "out_highest_prices.csv"]))
-ndiffs.write_data(single_row, "".join([ndiffs.file_path, "single_row.csv"]))
+    ndiffs.write_data(ranked_data, "".join([ndiffs.file_path, "full_out.csv"]))
+    ndiffs.write_data(highest_prices, "".join([ndiffs.file_path, "out_highest_prices.csv"]))
+    ndiffs.write_data(single_row, "".join([ndiffs.file_path, "single_row.csv"]))
