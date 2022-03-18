@@ -84,16 +84,20 @@ class NDiffs:
                                               "Exp Date Month Year", "Weighted IPO", "Number of Shares Weighted",
                                               "Price Per Initial Investment Weighted"]
 
-        print(dataset.index)
         df_reset_index = self.validate_and_reset_index(dataset, df_highest_prices_repeated, n)
         return df_reset_index
+
+    # TODO
+    def extend_dataset(self, dataset, end_date):
+        pass
 
     def validate_and_reset_index(self, old_dataset, dataset, n):
         is_valid = self.validate_length_of_index(old_dataset, dataset)
         if is_valid:
             dataset.index = old_dataset["Exp Date Month Year"]
         else:
-            self.validate_correct_number_of_fields_per_group(dataset, n)
+            invalid_dates = self.validate_correct_number_of_fields_per_group(dataset, n)
+            print(invalid_dates)
             dataset.index = old_dataset["Exp Date Month Year"].iloc[0:len(dataset)]
         dataset.index.name = "Date Index"
         return dataset
@@ -102,7 +106,7 @@ class NDiffs:
     def validate_correct_number_of_fields_per_group(dataset, n):
         boolean_check_of_nums = dataset.groupby(["Exp Date Month Year"]).size() == n
         invalid_dates = boolean_check_of_nums[boolean_check_of_nums == False]
-        print("Not enough data for ", invalid_dates)
+        return invalid_dates
 
     @staticmethod
     def validate_length_of_index(dataset, new_dataset):
