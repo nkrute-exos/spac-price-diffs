@@ -84,22 +84,25 @@ class NDiffs:
                                               "Exp Date Month Year", "Weighted IPO", "Number of Shares Weighted",
                                               "Price Per Initial Investment Weighted"]
 
-        df_reset_index = self.validate_and_reset_index(df_highest_prices_repeated)
+        print(dataset.index)
+        df_reset_index = self.validate_and_reset_index(dataset, df_highest_prices_repeated, n)
         return df_reset_index
 
-    def validate_and_reset_index(self, dataset):
-        is_valid = self.validate_length_of_index(dataset, dataset)
+    def validate_and_reset_index(self, old_dataset, dataset, n):
+        is_valid = self.validate_length_of_index(old_dataset, dataset)
         if is_valid:
-            dataset.index = dataset["Exp Date Month Year"]
+            dataset.index = old_dataset["Exp Date Month Year"]
         else:
-            self.validate_correct_number_of_fields_per_group()
-            dataset.index = dataset["Exp Date Month Year"].iloc[0:len(dataset)]
+            self.validate_correct_number_of_fields_per_group(dataset, n)
+            dataset.index = old_dataset["Exp Date Month Year"].iloc[0:len(dataset)]
         dataset.index.name = "Date Index"
         return dataset
 
     @staticmethod
-    def validate_correct_number_of_fields_per_group(dataset):
-        print(dataset.groupby(["Exp Date Month Year"]).size())
+    def validate_correct_number_of_fields_per_group(dataset, n):
+        boolean_check_of_nums = dataset.groupby(["Exp Date Month Year"]).size() == n
+        invalid_dates = boolean_check_of_nums[boolean_check_of_nums == False]
+        print("Not enough data for ", invalid_dates)
 
     @staticmethod
     def validate_length_of_index(dataset, new_dataset):
@@ -120,14 +123,13 @@ class NDiffs:
     @staticmethod
     def forward_fill_missing_data(dataset):
         dataset.ffill(inplace=True)
-        return dataset
 
     @staticmethod
     def write_data(dataset, file_output_path):
         dataset.to_csv(file_output_path)
 
 
-num_spacs = 2
+num_spacs = 1
 ndiffs = NDiffs()
 returned_spac_data = ndiffs.read_and_process_in_data("".join([ndiffs.file_path,
                                                      "2022_03_16 - SPAC reported yields.xlsx"]))
@@ -135,7 +137,7 @@ ndiffs.write_data(returned_spac_data, "".join([ndiffs.file_path, "full_out.csv"]
 
 ranked_data = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month_year_cutoff="05-2022")
 highest_prices = ndiffs.only_keep_top_n_spacs(ranked_data, num_spacs)
-ndiffs.validate_correct_number_of_fields_per_group(ranked_data)
+ndiffs.validate_correct_number_of_fields_per_group(ranked_data, num_spacs)
 
 ndiffs.write_data(ranked_data, "".join([ndiffs.file_path, "full_out.csv"]))
 ndiffs.write_data(highest_prices, "".join([ndiffs.file_path, "out_highest_prices.csv"]))
