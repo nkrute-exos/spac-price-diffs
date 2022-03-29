@@ -10,8 +10,8 @@ class NDiffs:
     file_path = "/Users/nicholaskrute/Documents/SPAC_Price_by_diffs/"
     headers = ["Issuer Name", "Common Ticket", "Remaining Life (months)", "Previous Closing Price",
                "Cash per Share in Trust", "Exp Date", "Ann. YTM - Last Reported", "IPO Size ($m)"]
-    spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_", "SPAC_Cash_in_Trust_", "SPAC_IPO_Size_",
-                    "SPAC_Num_Shares_"]
+    spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_", "SPAC_Cash_in_Trust_", "SPAC_Redeem_Date_",
+                    "SPAC_IPO_Size_", "SPAC_Num_Shares_"]
     start_date = pd.to_datetime("5/1/2022")  # taken from the original doc in sheet2
     end_date = pd.to_datetime("5/1/2024")
     initial_investment = 100000
@@ -43,7 +43,6 @@ class NDiffs:
         sorted_data = sorted_data[sorted_data["Exp Date Month Year"] > month_year_cutoff_obj]
         sorted_data = sorted_data.set_index(sorted_data["Exp Date Month Year"])
         sorted_data.index.name = "Index Date"
-        self.find_weighted_ipo(sorted_data)
         self.find_shares_and_price(sorted_data)
         return sorted_data
 
@@ -54,40 +53,39 @@ class NDiffs:
 
     @staticmethod
     def find_shares_and_price(dataset):
-        dataset["Number of Shares Weighted"] = (NDiffs.initial_investment * dataset["Weighted IPO"]) \
-                                                / dataset["Previous Closing Price"]
-        dataset["Profit Per Initial Weighted"] = dataset["Profit Per 100K"] * dataset["Weighted IPO"]
+        dataset["Number of Shares"] = NDiffs.initial_investment / dataset["Previous Closing Price"]
+        dataset["PnL"] = (dataset["Cash per Share in Trust"] - dataset["Previous Closing Price"]) \
+                         * dataset["Number of Shares"]
 
     def only_keep_top_n_spacs(self, dataset, n):
         rows_to_keep = [0] * n
         greatest_prices = [-99] * n
         greatest_price_rows = []
         for count, row in enumerate(dataset.iterrows(), start=1):
-            current_price = float(row[1]["Profit Per Initial Weighted"])
+            current_price = float(row[1]["PnL"])
             if current_price >= greatest_prices[0]:
                 greatest_prices[0] = float(current_price)
                 rows_to_keep[0] = row[1].values
-                greatest_prices, rows_to_keep = zip(*sorted(zip(greatest_prices, rows_to_keep)))
+                try:
+                    greatest_prices, rows_to_keep = zip(*sorted(zip(greatest_prices, rows_to_keep)))
+                except ValueError:
+                    continue
                 greatest_prices = list(greatest_prices)
                 rows_to_keep = list(rows_to_keep)
 
             if count % n == 0:
                 greatest_price_rows.append(copy.deepcopy(rows_to_keep))
 
-        # TODO note below
-        '''
-        using the dataset.index will only work if there's exactly n spacs per group, otherwise this will fail
-        with not enough rows found, should fix this
-        '''
         df_highest_prices_repeated = pd.DataFrame(np.row_stack(greatest_price_rows))
-        df_highest_prices_repeated.columns = ["Issuer Name", "Common Ticket", "Remaining Life (months)",
+        df_highest_prices_repeated.columns = ["Issuer Name", "Common Ticker", "Remaining Life (months)",
                                               "Previous Closing Price", "Cash per Share in Trust", "Exp Date",
                                               "Ann. YTM - Last Reported", "IPO Size ($m)", "Profit Per 100K",
-                                              "Exp Date Month Year", "Weighted IPO", "Number of Shares Weighted",
-                                              "Price Per Initial Investment Weighted"]
-
-        df_reset_index = self.validate_and_reset_index(dataset, df_highest_prices_repeated, n)
-        return df_reset_index
+                                              "Exp Date Month Year", "Number of Shares",
+                                              "PnL"]
+        date_index = self.generate_index(dataset.index[0], dataset.index[-1], n)
+        df_highest_prices_repeated["Redeem Date"] = date_index[0:len(df_highest_prices_repeated.index)]
+        df_highest_prices_repeated.set_index("Redeem Date", inplace=True)
+        return df_highest_prices_repeated
 
     def generate_single_row_from_top_n_spacs(self, dataset, n):
         single_rows = []
@@ -109,6 +107,7 @@ class NDiffs:
                 row_in_list.append(list(ranked)[1][1])  # ticker
                 row_in_list.append(list(ranked)[1][3])  # price
                 row_in_list.append(list(ranked)[1][4])  # cash in trust
+                row_in_list.append(list(ranked)[1][5])  # redeem date
                 row_in_list.append(list(ranked)[1][7])  # IPO size
                 row_in_list.append(list(ranked)[1][11])  # number of shares
             single_rows.append(row_in_list)
@@ -116,7 +115,24 @@ class NDiffs:
         average_dataset = pd.DataFrame(np.row_stack(single_rows), index=date_range, columns=column_names)
         return average_dataset
 
-    def generate_column_names(self, n):
+    @staticmethod
+    def generate_index(start_date, end_date, n):
+        date_range = pd.date_range(start=start_date,
+                                   end=end_date, freq="MS")
+        date_range = np.repeat(date_range, n)
+        return date_range
+
+    @staticmethod
+    def calc_number_of_shares_to_buy(dataset, prices, n):
+        dataset["Shares to Cover Evenly Split"] = 0
+        for k, v in prices.items():
+            divided_price = v / n
+            dataset["Shares to Cover Evenly Split"][k] = divided_price / dataset["Previous Closing Price"][k]
+
+        return dataset
+
+    @staticmethod
+    def generate_column_names(n):
         column_list = ["Average Closing Price", "Average Trust Value", "Number of Shares", "Profit Per 100K"]
         for n in range(n):
             for col in NDiffs.spac_headers:
@@ -129,16 +145,6 @@ class NDiffs:
         reindexed_data = dataset.reindex(date_range)
         self.forward_fill_missing_data(reindexed_data)
         return reindexed_data
-
-    def validate_and_reset_index(self, old_dataset, dataset, n):
-        is_valid = self.validate_length_of_index(old_dataset, dataset)
-        if is_valid:
-            dataset.index = old_dataset["Exp Date Month Year"]
-        else:
-            invalid_dates = self.validate_correct_number_of_fields_per_group(dataset, n)
-            dataset.index = old_dataset["Exp Date Month Year"].iloc[0:len(dataset)]
-        dataset.index.name = "Date Index"
-        return dataset
 
     @staticmethod
     def validate_correct_number_of_fields_per_group(dataset, n):
@@ -162,18 +168,21 @@ class NDiffs:
 
 
 if __name__ == "__main__":
-    num_spacs = 3
+    amount_to_cover = {"10/1/22": 4611111.11, "11/1/22": 4722222.22,  "12/1/22": 4722222.22, "1/1/23": 4722222.22,
+                       "2/1/23": 4722222.22, "3/1/23": 4722222.22, "4/1/23": 4722222.22, "5/1/23": 4722222.22,
+                       "6/1/23": 4722222.22, "7/1/23": 4722222.22, "8/1/23": 4722222.22, "9/1/23": 4722222.22,
+                       "10/1/23": 4722222.22, "11/1/23": 4722222.22}
+    columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price", "Cash per Share in Trust", "Exp Date",
+                       "Profit Per 100K", "Number of Shares", "PnL", "Shares to Cover Evenly Split"]
+    num_spacs = 2
     ndiffs = NDiffs()
     returned_spac_data = ndiffs.read_and_process_in_data("".join([ndiffs.file_path,
-                                                         "2022_03_16 - SPAC reported yields.xlsx"]))
+                                                         "2022_03_29 - SPAC reported yields.xlsx"]))
     ndiffs.write_data(returned_spac_data, "".join([ndiffs.file_path, "full_out.csv"]))
 
     ranked_data = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month_year_cutoff="05-2022")
     highest_prices = ndiffs.only_keep_top_n_spacs(ranked_data, num_spacs)
-
-    single_row = ndiffs.generate_single_row_from_top_n_spacs(highest_prices, num_spacs)
-    single_row = ndiffs.extend_dataset(single_row, NDiffs.end_date)
+    highest_prices = ndiffs.calc_number_of_shares_to_buy(highest_prices, amount_to_cover, num_spacs)
 
     ndiffs.write_data(ranked_data, "".join([ndiffs.file_path, "full_out.csv"]))
-    ndiffs.write_data(highest_prices, "".join([ndiffs.file_path, "out_highest_prices.csv"]))
-    ndiffs.write_data(single_row, "".join([ndiffs.file_path, "single_row.csv"]))
+    ndiffs.write_data(highest_prices[columns_to_keep], "".join([ndiffs.file_path, "ranked_data.csv"]))
