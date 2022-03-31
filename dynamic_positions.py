@@ -54,19 +54,12 @@ async def generate_deal_from_qp(config: dict, identifier: str) -> dict:
     platform_security = await Platform.from_dict(config)
     engine_security: Engine = await platform_security.ts.security(imnt=identifier)
     values_json = json.loads(engine_security.origin_ref_data["full_json_str"])
-    identifier_json = {"identifier": engine_security.exos_id,
-                       "description": engine_security.origin_ref_data["name"],
-                       "clc": values_json["clc"],
-                       "draw_price": values_json["draw_price"],
-                       "draw_schedule": values_json["draw_schedule"]}
-
-    return identifier_json
+    return values_json
 
 # there's slight differences in the draw values which is why if you compare this to the original it's off
 __center_city = asyncio.run(generate_deal_from_qp(qp_config, "b1b02263-b0ca-468d-b015-5b08209278a8"))
 
 identifier_list = asyncio.run(generate_list_of_deal_identifiers(qp_config))
-print(identifier_list)
 
 deal_list = []
 for identity in identifier_list:
