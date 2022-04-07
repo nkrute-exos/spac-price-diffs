@@ -1,7 +1,5 @@
 """Code to take an Excel sheet of spac cash per share in trust compared to the previous closing price
    and group by the month and year. Then only show the highest n number of price diffs"""
-import typing
-
 import numpy as np
 import pandas as pd
 import datetime
@@ -18,7 +16,8 @@ class NDiffs:
     end_date = pd.to_datetime("5/1/2024")
     initial_investment = 100000
 
-    def read_and_process_in_data(self, file_name: typing.IO) -> pd.DataFrame:
+    @staticmethod
+    def read_and_process_in_data(file_name: str) -> pd.DataFrame:
         spac_data = pd.read_excel(file_name)
         spac_data = spac_data.iloc[6:, 1:]  # want to figure out how to replace this
         spac_data.columns = NDiffs.headers
@@ -27,7 +26,7 @@ class NDiffs:
         spac_data["Exp Date Year"] = spac_data["Redeem Date"].dt.strftime('%Y')
         spac_data["Exp Date Month"] = spac_data["Redeem Date"].dt.strftime('%m')
         spac_data["Profit Per 100K"] = (NDiffs.initial_investment / spac_data["Previous Closing Price"]) \
-                                      * (spac_data["Cash per Share in Trust"] - spac_data["Previous Closing Price"])
+                                       * (spac_data["Cash per Share in Trust"] - spac_data["Previous Closing Price"])
         return spac_data
 
     def rank_by_diff_and_month(self, dataset: pd.DataFrame, n: int, month_year_cutoff: str = "1/1/1970"):
@@ -35,8 +34,8 @@ class NDiffs:
                                           ascending=[True, True, False])
         sorted_data = sorted_data.groupby('Redeem Date').head(n)
         sorted_data = sorted_data[["Issuer Name", "Common Ticket", "Remaining Life (months)", "Previous Closing Price",
-                                   "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported", "IPO Size ($m)",
-                                   "Profit Per 100K"]]
+                                   "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported",
+                                   "IPO Size ($m)", "Profit Per 100K"]]
 
         month_year_cutoff_obj = datetime.datetime.strptime(month_year_cutoff, "%m-%Y")
         sorted_data["Redeem Date"] = pd.to_datetime(sorted_data["Redeem Date"], format="%m-%Y")
@@ -46,12 +45,12 @@ class NDiffs:
         self.find_shares_and_price(sorted_data)
         len_sorted_data = len(sorted_data)
         index_with_missing_dates = self.generate_index(start_date=sorted_data["Redeem Date"].iloc[0],
-                                   end_date=sorted_data["Redeem Date"].iloc[-1], n=n)
-        extra_rows = pd.DataFrame(0, index=np.arange(len(index_with_missing_dates)-len(sorted_data)),
+                                                       end_date=sorted_data["Redeem Date"].iloc[-1], n=n)
+        extra_rows = pd.DataFrame(0, index=np.arange(len(index_with_missing_dates) - len(sorted_data)),
                                   columns=["Issuer Name", "Common Ticket", "Remaining Life (months)",
-                                  "Previous Closing Price", "Cash per Share in Trust", "Redeem Date",
-                                  "Ann. YTM - Last Reported", "IPO Size ($m)", "Profit Per 100K", "Number of Shares",
-                                  "PnL"])
+                                           "Previous Closing Price", "Cash per Share in Trust", "Redeem Date",
+                                           "Ann. YTM - Last Reported", "IPO Size ($m)", "Profit Per 100K",
+                                           "Number of Shares", "PnL"])
         sorted_data = pd.concat([sorted_data, extra_rows], axis=0)
         fully_missing_dates = index_with_missing_dates.difference(sorted_data["Redeem Date"])
         date_counts = sorted_data["Redeem Date"].value_counts()
@@ -63,7 +62,7 @@ class NDiffs:
             for x in range(partially_missing_date_count):
                 missing_dates_partial.append(partially_missing_date[0])
 
-        fully_missing_dates = list(np.repeat(fully_missing_dates,n))
+        fully_missing_dates = list(np.repeat(fully_missing_dates, n))
         for date in missing_dates_partial:
             fully_missing_dates.append(date)
 
@@ -163,7 +162,7 @@ class NDiffs:
         column_list = ["Average Closing Price", "Average Trust Value", "Number of Shares", "Profit Per 100K"]
         for n in range(n):
             for col in NDiffs.spac_headers:
-                column_list.append(str(col+str(n+1)))
+                column_list.append(str(col + str(n + 1)))
         return column_list
 
     def extend_dataset(self, dataset: pd.DataFrame, end_date: datetime.date) -> pd.DataFrame:
@@ -174,19 +173,13 @@ class NDiffs:
         return reindexed_data
 
     @staticmethod
-    def validate_correct_number_of_fields_per_group(dataset: pd.DataFrame, n: int) -> list[datetime.date]:
-        boolean_check_of_nums = dataset.groupby(["Redeem Date"]).size() == n
-        invalid_dates = boolean_check_of_nums[boolean_check_of_nums == False]
-        return invalid_dates
-
-    @staticmethod
     def validate_length_of_index(dataset: pd.DataFrame, new_dataset: pd.DataFrame) -> bool:
         len_of_index_dataset = len(dataset.index)
         len_of_index_new_dataset = len(new_dataset.index)
         return len_of_index_dataset == len_of_index_new_dataset
 
     @staticmethod
-    def forward_fill_missing_data(dataset: pd.DataFrame, n: int) -> None:
+    def forward_fill_missing_data(dataset: pd.DataFrame) -> None:
         final_n_valid_rows = dataset[dataset.index == dataset.index[-1]]
         dataset.ffill(final_n_valid_rows, inplace=True)
 
@@ -202,7 +195,7 @@ class NDiffs:
 
 
 if __name__ == "__main__":
-    amount_to_cover = {"10/1/22": 4611111.11, "11/1/22": 4722222.22,  "12/1/22": 4722222.22, "1/1/23": 4722222.22,
+    amount_to_cover = {"10/1/22": 4611111.11, "11/1/22": 4722222.22, "12/1/22": 4722222.22, "1/1/23": 4722222.22,
                        "2/1/23": 4722222.22, "3/1/23": 4722222.22, "4/1/23": 4722222.22, "5/1/23": 4722222.22,
                        "6/1/23": 4722222.22, "7/1/23": 4722222.22, "8/1/23": 4722222.22, "9/1/23": 4722222.22,
                        "10/1/23": 4722222.22, "11/1/23": 4722222.22}
@@ -211,7 +204,7 @@ if __name__ == "__main__":
     num_spacs = 4
     ndiffs = NDiffs()
     returned_spac_data = ndiffs.read_and_process_in_data("".join([ndiffs.file_path,
-                                                         "in_data/", "2022_04_05_SPAC_reported_yields.xlsx"]))
+                                                                  "in_data/", "2022_04_05_SPAC_reported_yields.xlsx"]))
 
     full_out = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month_year_cutoff="05-2022")
     highest_prices = ndiffs.only_keep_top_n_spacs(full_out, num_spacs)
