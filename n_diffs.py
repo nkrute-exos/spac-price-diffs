@@ -4,11 +4,12 @@ import numpy as np
 import pandas as pd
 import datetime
 import copy
+from outsideLiquidationDate import LiquidationDates
 
 
 class NDiffs:
     file_path = "/Users/nicholaskrute/Documents/SPAC_Price_by_diffs/"
-    headers = ["Issuer Name", "Common Ticket", "Remaining Life (months)", "Previous Closing Price",
+    headers = ["Issuer Name", "Common Ticker", "Remaining Life (months)", "Previous Closing Price",
                "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported", "IPO Size ($m)"]
     spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_", "SPAC_Cash_in_Trust_", "SPAC_Redeem_Date_",
                     "SPAC_IPO_Size_", "SPAC_Num_Shares_"]
@@ -23,6 +24,8 @@ class NDiffs:
         spac_data.columns = NDiffs.headers
         spac_data = spac_data.reset_index(drop=True)
         spac_data["Redeem Date"] = pd.to_datetime(spac_data["Redeem Date"]) + pd.offsets.MonthBegin(1)
+        liquidation_data = LiquidationDates.get_liquidation_dates()
+        spac_data = LiquidationDates.update_redeem_dates(spac_data, liquidation_data)
         spac_data["Exp Date Year"] = spac_data["Redeem Date"].dt.strftime('%Y')
         spac_data["Exp Date Month"] = spac_data["Redeem Date"].dt.strftime('%m')
         spac_data["Profit Per 100K"] = (NDiffs.initial_investment / spac_data["Previous Closing Price"]) \
@@ -33,7 +36,7 @@ class NDiffs:
         sorted_data = dataset.sort_values(by=["Exp Date Year", "Exp Date Month", "Profit Per 100K"],
                                           ascending=[True, True, False])
         sorted_data = sorted_data.groupby('Redeem Date').head(n)
-        sorted_data = sorted_data[["Issuer Name", "Common Ticket", "Remaining Life (months)", "Previous Closing Price",
+        sorted_data = sorted_data[["Issuer Name", "Common Ticker", "Remaining Life (months)", "Previous Closing Price",
                                    "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported",
                                    "IPO Size ($m)", "Profit Per 100K"]]
 
@@ -47,7 +50,7 @@ class NDiffs:
         index_with_missing_dates = self.generate_index(start_date=sorted_data["Redeem Date"].iloc[0],
                                                        end_date=sorted_data["Redeem Date"].iloc[-1], n=n)
         extra_rows = pd.DataFrame(0, index=np.arange(len(index_with_missing_dates) - len(sorted_data)),
-                                  columns=["Issuer Name", "Common Ticket", "Remaining Life (months)",
+                                  columns=["Issuer Name", "Common Ticker", "Remaining Life (months)",
                                            "Previous Closing Price", "Cash per Share in Trust", "Redeem Date",
                                            "Ann. YTM - Last Reported", "IPO Size ($m)", "Profit Per 100K",
                                            "Number of Shares", "PnL"])
@@ -193,7 +196,6 @@ class NDiffs:
         boolean_check = False in boolean_check_series
         return boolean_check
 
-
 if __name__ == "__main__":
     amount_to_cover = {"10/1/22": 4611111.11, "11/1/22": 4722222.22, "12/1/22": 4722222.22, "1/1/23": 4722222.22,
                        "2/1/23": 4722222.22, "3/1/23": 4722222.22, "4/1/23": 4722222.22, "5/1/23": 4722222.22,
@@ -201,7 +203,7 @@ if __name__ == "__main__":
                        "10/1/23": 4722222.22, "11/1/23": 4722222.22}
     columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price", "Cash per Share in Trust",
                        "Redeem Date", "Profit Per 100K", "Number of Shares", "PnL", "Shares to Cover Evenly Split"]
-    num_spacs = 4
+    num_spacs = 8
     ndiffs = NDiffs()
     returned_spac_data = ndiffs.read_and_process_in_data("".join([ndiffs.file_path,
                                                                   "in_data/", "2022_04_05_SPAC_reported_yields.xlsx"]))
