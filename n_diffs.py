@@ -44,7 +44,6 @@ class NDiffs:
         sorted_data = sorted_data.set_index(sorted_data["Redeem Date"])
         sorted_data.index.name = "Index Date"
         self.find_shares_and_price(sorted_data)
-        #NEW CODE
         len_sorted_data = len(sorted_data)
         index_with_missing_dates = self.generate_index(start_date=sorted_data["Redeem Date"].iloc[0],
                                    end_date=sorted_data["Redeem Date"].iloc[-1], n=n)
@@ -195,6 +194,12 @@ class NDiffs:
     def write_data(dataset: pd.DataFrame, file_output_path: str) -> None:
         dataset.to_csv(file_output_path)
 
+    @staticmethod
+    def validate_no_out_of_range_dates(dataset: pd.DataFrame) -> bool:
+        boolean_check_series = dataset.index >= dataset["Redeem Date"]
+        boolean_check = False in boolean_check_series
+        return boolean_check
+
 
 if __name__ == "__main__":
     amount_to_cover = {"10/1/22": 4611111.11, "11/1/22": 4722222.22,  "12/1/22": 4722222.22, "1/1/23": 4722222.22,
@@ -203,14 +208,18 @@ if __name__ == "__main__":
                        "10/1/23": 4722222.22, "11/1/23": 4722222.22}
     columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price", "Cash per Share in Trust",
                        "Redeem Date", "Profit Per 100K", "Number of Shares", "PnL", "Shares to Cover Evenly Split"]
-    num_spacs = 5
+    num_spacs = 4
     ndiffs = NDiffs()
     returned_spac_data = ndiffs.read_and_process_in_data("".join([ndiffs.file_path,
-                                                         "2022_03_29 - SPAC reported yields.xlsx"]))
+                                                         "in_data/", "2022_04_05_SPAC_reported_yields.xlsx"]))
 
     full_out = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month_year_cutoff="05-2022")
     highest_prices = ndiffs.only_keep_top_n_spacs(full_out, num_spacs)
     highest_prices = ndiffs.calc_number_of_shares_to_buy(highest_prices, amount_to_cover, num_spacs)
 
-    ndiffs.write_data(full_out, "".join([ndiffs.file_path, "full_out.csv"]))
-    ndiffs.write_data(highest_prices[columns_to_keep], "".join([ndiffs.file_path, "ranked_data.csv"]))
+    date_check = ndiffs.validate_no_out_of_range_dates(highest_prices[columns_to_keep])
+    if date_check:
+        print("ERROR IN DATES, PLEASE VALIDATE THE FIELDS")
+    else:
+        ndiffs.write_data(full_out, "".join([ndiffs.file_path, "out_data/", "full_out.csv"]))
+        ndiffs.write_data(highest_prices[columns_to_keep], "".join([ndiffs.file_path, "out_data/", "ranked_data.csv"]))
