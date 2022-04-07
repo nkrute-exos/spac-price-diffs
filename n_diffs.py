@@ -168,23 +168,24 @@ class NDiffs:
                 column_list.append(str(col + str(n + 1)))
         return column_list
 
-    def extend_dataset(self, dataset: pd.DataFrame, end_date: datetime.date) -> pd.DataFrame:
-        date_range = pd.date_range(start=dataset.index[0],
+    @staticmethod
+    def extend_dataset(dataset: pd.DataFrame, end_date: datetime.date, n: int) -> pd.DataFrame:
+        date_range = pd.date_range(start=dataset.index[-1] + pd.offsets.DateOffset(1),
                                    end=end_date, freq="MS")
-        reindexed_data = dataset.reindex(date_range)
-        self.forward_fill_missing_data(reindexed_data)
-        return reindexed_data
+        new_dates_len = len(date_range)
+        date_range_repeated = np.repeat(date_range, n)
+        last_n_rows = dataset[dataset.index == dataset.index[-1]]
+        removed_index = last_n_rows.reset_index()
+        extra_dates = pd.concat([removed_index]*new_dates_len, ignore_index=True)
+        extra_dates.index = date_range_repeated
+        #extra_dates = extra_dates.iloc[:, :-1]
+        return pd.concat([dataset, extra_dates])
 
     @staticmethod
     def validate_length_of_index(dataset: pd.DataFrame, new_dataset: pd.DataFrame) -> bool:
         len_of_index_dataset = len(dataset.index)
         len_of_index_new_dataset = len(new_dataset.index)
         return len_of_index_dataset == len_of_index_new_dataset
-
-    @staticmethod
-    def forward_fill_missing_data(dataset: pd.DataFrame) -> None:
-        final_n_valid_rows = dataset[dataset.index == dataset.index[-1]]
-        dataset.ffill(final_n_valid_rows, inplace=True)
 
     @staticmethod
     def write_data(dataset: pd.DataFrame, file_output_path: str) -> None:
@@ -195,6 +196,7 @@ class NDiffs:
         boolean_check_series = dataset.index >= dataset["Redeem Date"]
         boolean_check = False in boolean_check_series
         return boolean_check
+
 
 if __name__ == "__main__":
     amount_to_cover = {"10/1/22": 4611111.11, "11/1/22": 4722222.22, "12/1/22": 4722222.22, "1/1/23": 4722222.22,
@@ -216,5 +218,6 @@ if __name__ == "__main__":
     if date_check:
         print("ERROR IN DATES, PLEASE VALIDATE THE FIELDS")
     else:
+        extended_data = ndiffs.extend_dataset(highest_prices[columns_to_keep], pd.to_datetime("5/1/2024"), num_spacs)
         ndiffs.write_data(full_out, "".join([ndiffs.file_path, "out_data/", "full_out.csv"]))
-        ndiffs.write_data(highest_prices[columns_to_keep], "".join([ndiffs.file_path, "out_data/", "ranked_data.csv"]))
+        ndiffs.write_data(extended_data, "".join([ndiffs.file_path, "out_data/", "ranked_data.csv"]))
