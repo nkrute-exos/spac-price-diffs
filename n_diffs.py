@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import datetime
 import copy
-from outsideLiquidationDate import LiquidationDates
+from outsideLiquidationDate import CDMData
 
 
 class NDiffs:
@@ -14,18 +14,19 @@ class NDiffs:
     spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_", "SPAC_Cash_in_Trust_", "SPAC_Redeem_Date_",
                     "SPAC_IPO_Size_", "SPAC_Num_Shares_"]
     start_date = pd.to_datetime("5/1/2022")  # taken from the original doc in sheet2
-    end_date = pd.to_datetime("5/1/2024")
+    end_date = pd.to_datetime("5/1/2025")
     initial_investment = 100000
 
     @staticmethod
     def read_and_process_in_data(file_name: str) -> pd.DataFrame:
+        cdm_data = CDMData()
         spac_data = pd.read_excel(file_name)
         spac_data = spac_data.iloc[6:, 1:]  # want to figure out how to replace this
         spac_data.columns = NDiffs.headers
         spac_data = spac_data.reset_index(drop=True)
         spac_data["Redeem Date"] = pd.to_datetime(spac_data["Redeem Date"]) + pd.offsets.MonthBegin(1)
-        liquidation_data = LiquidationDates.get_liquidation_dates()
-        spac_data = LiquidationDates.update_redeem_dates(spac_data, liquidation_data)
+        liquidation_data = cdm_data.get_liquidation_dates()
+        spac_data = cdm_data.update_redeem_dates(spac_data, liquidation_data)
         spac_data["Exp Date Year"] = spac_data["Redeem Date"].dt.strftime('%Y')
         spac_data["Exp Date Month"] = spac_data["Redeem Date"].dt.strftime('%m')
         spac_data["Profit Per 100K"] = (NDiffs.initial_investment / spac_data["Previous Closing Price"]) \
@@ -178,8 +179,7 @@ class NDiffs:
         removed_index = last_n_rows.reset_index()
         extra_dates = pd.concat([removed_index]*new_dates_len, ignore_index=True)
         extra_dates.index = date_range_repeated
-        #extra_dates = extra_dates.iloc[:, :-1]
-        return pd.concat([dataset, extra_dates])
+        return pd.concat([dataset, extra_dates]).drop(columns="Date")
 
     @staticmethod
     def validate_length_of_index(dataset: pd.DataFrame, new_dataset: pd.DataFrame) -> bool:
@@ -197,27 +197,7 @@ class NDiffs:
         boolean_check = False in boolean_check_series
         return boolean_check
 
-
-if __name__ == "__main__":
-    amount_to_cover = {"10/1/22": 4611111.11, "11/1/22": 4722222.22, "12/1/22": 4722222.22, "1/1/23": 4722222.22,
-                       "2/1/23": 4722222.22, "3/1/23": 4722222.22, "4/1/23": 4722222.22, "5/1/23": 4722222.22,
-                       "6/1/23": 4722222.22, "7/1/23": 4722222.22, "8/1/23": 4722222.22, "9/1/23": 4722222.22,
-                       "10/1/23": 4722222.22, "11/1/23": 4722222.22}
-    columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price", "Cash per Share in Trust",
-                       "Redeem Date", "Profit Per 100K", "Number of Shares", "PnL", "Shares to Cover Evenly Split"]
-    num_spacs = 8
-    ndiffs = NDiffs()
-    returned_spac_data = ndiffs.read_and_process_in_data("".join([ndiffs.file_path,
-                                                                  "in_data/", "2022_04_05_SPAC_reported_yields.xlsx"]))
-
-    full_out = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month_year_cutoff="05-2022")
-    highest_prices = ndiffs.only_keep_top_n_spacs(full_out, num_spacs)
-    highest_prices = ndiffs.calc_number_of_shares_to_buy(highest_prices, amount_to_cover, num_spacs)
-
-    date_check = ndiffs.validate_no_out_of_range_dates(highest_prices[columns_to_keep])
-    if date_check:
-        print("ERROR IN DATES, PLEASE VALIDATE THE FIELDS")
-    else:
-        extended_data = ndiffs.extend_dataset(highest_prices[columns_to_keep], pd.to_datetime("5/1/2024"), num_spacs)
-        ndiffs.write_data(full_out, "".join([ndiffs.file_path, "out_data/", "full_out.csv"]))
-        ndiffs.write_data(extended_data, "".join([ndiffs.file_path, "out_data/", "ranked_data.csv"]))
+    @staticmethod
+    def make_ending_dates_all_zero(dataset: pd.DataFrame, end_date: datetime.date) -> pd.DataFrame:
+        dataset.loc[dataset.index > end_date, "Shares to Cover Evenly Split"] = 0
+        return dataset
