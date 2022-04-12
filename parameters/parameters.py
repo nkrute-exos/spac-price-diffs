@@ -1,0 +1,17 @@
+project_cost = 200000000  # dollars
+equity_in = 67000000  # dollars
+value_at_stab = 250000000  # dollars
+wl_balance = 133000000  # dollars
+start_date = "5/1/22"  # date
+construction_term = 27  # int
+actual_cons_term = 27  # int
+refinance_term = 60  # int
+initial_draw_percent = .15  # percent
+wl_spread = 400  # bps?
+libor_floor = .25  # percent
+a_adv = .75  # percent
+a_spread = 250  # bps?
+reinv_percent = .25  # percent
+refinance_date = "5/1/27"  # date
+pari_passu = 1  # mode?
+libor = 0.0010814  # float
