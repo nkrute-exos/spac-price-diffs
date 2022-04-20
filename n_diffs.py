@@ -18,10 +18,24 @@ class NDiffs:
     initial_investment = 100000
 
     @staticmethod
-    def read_and_process_in_data(file_name: str) -> pd.DataFrame:
+    def read_and_process_in_data_cantor(file_name: str) -> pd.DataFrame:
         cdm_data = CDMData()
         spac_data = pd.read_excel(file_name)
         spac_data = spac_data.iloc[6:, 1:]  # want to figure out how to replace this
+        spac_data.columns = NDiffs.headers
+        spac_data = spac_data.reset_index(drop=True)
+        spac_data["Redeem Date"] = pd.to_datetime(spac_data["Redeem Date"]) + pd.offsets.MonthBegin(1)
+        liquidation_data = cdm_data.get_liquidation_dates()
+        spac_data = cdm_data.update_redeem_dates(spac_data, liquidation_data)
+        spac_data["Exp Date Year"] = spac_data["Redeem Date"].dt.strftime('%Y')
+        spac_data["Exp Date Month"] = spac_data["Redeem Date"].dt.strftime('%m')
+        spac_data["Profit Per 100K"] = (NDiffs.initial_investment / spac_data["Previous Closing Price"]) \
+                                       * (spac_data["Cash per Share in Trust"] - spac_data["Previous Closing Price"])
+        return spac_data
+
+    @staticmethod
+    def read_and_process_in_data_cdm(spac_data: pd.DataFrame) -> pd.DataFrame:
+        cdm_data = CDMData()
         spac_data.columns = NDiffs.headers
         spac_data = spac_data.reset_index(drop=True)
         spac_data["Redeem Date"] = pd.to_datetime(spac_data["Redeem Date"]) + pd.offsets.MonthBegin(1)
