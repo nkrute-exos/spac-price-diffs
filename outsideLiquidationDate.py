@@ -69,7 +69,8 @@ class CDMData:
         return dataset
 
     # we no longer get cantor data, so going to make cdm look like cantor along with some extra processing
-    def make_cdm_file_from_cantor_file(self, price_data: str, trade_date: str, filter_prices: bool = True) -> pd.DataFrame:
+    def make_cdm_file_from_cantor_file(self, price_data: str, trade_date: str,
+                                       filter_prices: bool = True) -> pd.DataFrame:
         df_spac_research = self.create_spac_research_file()
         df_spac_research = df_spac_research[df_spac_research['target'] == True]
         cantor_like_data = df_spac_research[['name', 'symbol', 'trustSharePrice', 'estimatedCashAtLiquidation',
@@ -79,23 +80,26 @@ class CDMData:
         cantor_like_data['Remaining Life (Months)'] = 0
         cantor_like_data['IPO Size ($m)'] = 0
         cantor_like_data['Ann. YTM - Last Reported'] = 0
+
         df_to_return = cantor_like_data[['name', 'symbol', 'Remaining Life (Months)', 'trustSharePrice',
                                          'estimatedCashAtLiquidation', 'Exp Date', 'Ann. YTM - Last Reported',
                                          'IPO Size ($m)']]
         columns = ["Issuer Name", "Common Ticker", "Remaining Life (Months)", "Previous Closing Price",
                    "Cash per Share in Trust", "Exp Date", "Ann. YTM - Last Reported", "IPO Size ($m)"]
         df_to_return.columns = columns
+        df_to_return["Previous Closing Price"] = 100
         month_year_cutoff_obj = datetime.datetime.strptime(trade_date, "%m/%d/%Y")
         df_to_return["Exp Date"] = pd.to_datetime(df_to_return["Exp Date"], format="%Y-%m-%d")
         df_to_return = df_to_return[df_to_return["Exp Date"] >= month_year_cutoff_obj]
         spac_price_data = self.get_historical_prices(price_data)
 
         for row in df_to_return.iterrows():
+            ticker = row[1]["Common Ticker"]
             try:
-                df_to_return.loc[df_to_return["Issuer Name"] == row[1]["Issuer Name"], "Previous Closing Price"] = \
-                    spac_price_data.loc[row[1]["Issuer Name"]]
+                df_to_return.loc[df_to_return["Common Ticker"] == ticker, "Previous Closing Price"] = \
+                    spac_price_data[ticker]
             except KeyError:
-                df_to_return.loc[df_to_return["Issuer Name"] == row[1]["Issuer Name"], "Previous Closing Price"] = 100
+                df_to_return.loc[df_to_return["Common Ticker"] == ticker, "Previous Closing Price"] = 100
         if filter_prices:
             df_to_return = df_to_return[df_to_return["Previous Closing Price"] < 12]
             df_to_return = df_to_return[df_to_return["Previous Closing Price"] > 8]
@@ -104,6 +108,5 @@ class CDMData:
 
     @staticmethod
     def get_historical_prices(price_data: str) -> pd.DataFrame:
-        df = pd.read_excel(price_data, sheet_name="spac_price_data")
-        return df.loc[1]  # this is for date 2022-04-19
-
+        df = pd.read_excel(price_data, sheet_name="Price Statistics")
+        return df.loc[7]  # this is for the last price row
