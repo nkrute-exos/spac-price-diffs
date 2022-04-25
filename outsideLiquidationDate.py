@@ -14,7 +14,7 @@ class CDMData:
         today = dt.date.today()
         use_date = today - BDay(1)
         t_f = use_date.strftime('%Y-%m-%d')
-        client = Client('www.kubeprodapi.aws.aurotfp.com/cdm-metadata-query-service')
+        client = Client('www.kubepocapi.aws.aurotfp.com/cdm-metadata-query-service')
 
         spac_research = 'exos.tfp.spac_research.securities.typed.'
         record_spac_research = client.get_record(spac_research + t_f)
@@ -32,7 +32,7 @@ class CDMData:
         use_date = today - BDay(1)
         t_f = use_date.strftime('%Y-%m-%d')
 
-        client = Client('www.kubeprodapi.aws.aurotfp.com/cdm-metadata-query-service')
+        client = Client('www.kubepocdapi.aws.aurotfp.com/cdm-metadata-query-service')
 
         spac_research = 'exos.tfp.spac_research.securities.typed.'
         record_spac_research = client.get_record(spac_research + t_f)
@@ -68,45 +68,59 @@ class CDMData:
                     newer_price["estimatedCashAtLiquidation"].values[0]
         return dataset
 
-    # we no longer get cantor data, so going to make cdm look like cantor along with some extra processing
-    def make_cdm_file_from_cantor_file(self, price_data: str, trade_date: str,
-                                       filter_prices: bool = True) -> pd.DataFrame:
-        df_spac_research = self.create_spac_research_file()
-        df_spac_research = df_spac_research[df_spac_research['target'] == True]
-        cantor_like_data = df_spac_research[['name', 'symbol', 'trustSharePrice', 'estimatedCashAtLiquidation',
-                                             'endDate', 'mergerOutsideDate']]
-        cantor_like_data["Exp Date"] = np.where(~df_spac_research['mergerOutsideDate'].isnull(),
-                                                df_spac_research['mergerOutsideDate'], df_spac_research['endDate'])
-        cantor_like_data['Remaining Life (Months)'] = 0
-        cantor_like_data['IPO Size ($m)'] = 0
-        cantor_like_data['Ann. YTM - Last Reported'] = 0
-
-        df_to_return = cantor_like_data[['name', 'symbol', 'Remaining Life (Months)', 'trustSharePrice',
-                                         'estimatedCashAtLiquidation', 'Exp Date', 'Ann. YTM - Last Reported',
-                                         'IPO Size ($m)']]
-        columns = ["Issuer Name", "Common Ticker", "Remaining Life (Months)", "Previous Closing Price",
-                   "Cash per Share in Trust", "Exp Date", "Ann. YTM - Last Reported", "IPO Size ($m)"]
-        df_to_return.columns = columns
-        df_to_return["Previous Closing Price"] = 100
-        month_year_cutoff_obj = datetime.datetime.strptime(trade_date, "%m/%d/%Y")
-        df_to_return["Exp Date"] = pd.to_datetime(df_to_return["Exp Date"], format="%Y-%m-%d")
-        df_to_return = df_to_return[df_to_return["Exp Date"] >= month_year_cutoff_obj]
-        spac_price_data = self.get_historical_prices(price_data)
-
-        for row in df_to_return.iterrows():
-            ticker = row[1]["Common Ticker"]
-            try:
-                df_to_return.loc[df_to_return["Common Ticker"] == ticker, "Previous Closing Price"] = \
-                    spac_price_data[ticker]
-            except KeyError:
-                df_to_return.loc[df_to_return["Common Ticker"] == ticker, "Previous Closing Price"] = 100
-        if filter_prices:
-            df_to_return = df_to_return[df_to_return["Previous Closing Price"] < 12]
-            df_to_return = df_to_return[df_to_return["Previous Closing Price"] > 8]
-
-        return df_to_return.reset_index(drop=True)
+    @staticmethod
+    def get_historical_prices(price_data: str, look_back: int = 1) -> pd.DataFrame:  # from price table
+        df = pd.read_excel(price_data, sheet_name="spac_price_data")
+        new_header = df.iloc[0]
+        df = df[1:]
+        df.columns = new_header
+        return df.loc[0: look_back]
 
     @staticmethod
-    def get_historical_prices(price_data: str) -> pd.DataFrame:
+    def get_yields(price_data: str) -> pd.DataFrame:
         df = pd.read_excel(price_data, sheet_name="Price Statistics")
-        return df.loc[7]  # this is for the last price row
+        tickers = []
+        yields = []
+        columns = df.columns[3:]
+        for ticker in columns:
+            tickers.append(ticker)
+            yields.append(df[ticker].loc[15])
+        return pd.DataFrame(data={"Tickers": tickers, "Yields": yields})
+
+    def get_spacs_from_dashboard(self, board: str, start_date: str, look_back: int = 5) -> pd.DataFrame:
+        df = pd.read_excel(board, sheet_name="spac_research")
+        df_filtered = df[(df["Announced"] == False)
+                         & (df['type'] == 'common')
+                         & (df['endDate'] > start_date)]
+        df_filtered.reset_index(inplace=True)
+        cantor_like_data = df_filtered[['name', 'symbol', 'Days to Go2', 'Market Price', 'estimatedCashAtLiquidation',
+                                        'endDate', 'outsideLiquidationDate', 'YTM']]
+        cantor_like_data["Exp Date"] = np.where(~df_filtered['outsideLiquidationDate'].isnull(),
+                                                df_filtered['outsideLiquidationDate'], df_filtered['endDate'])
+        cantor_like_data["IPO Size ($m)"] = 0
+        cantor_like_data["Exp Date"] = pd.to_datetime(cantor_like_data["Exp Date"], format="%Y-%m-%d")
+        cantor_like_data = cantor_like_data[['name', 'symbol', 'Days to Go2', 'Market Price',
+                                             'estimatedCashAtLiquidation', 'Exp Date', 'YTM',
+                                             'IPO Size ($m)']]
+
+        columns = ["Issuer Name", "Common Ticker", "Remaining Life (Months)", "Previous Closing Price",
+                   "Cash per Share in Trust", "Exp Date", "Ann. YTM - Last Reported", "IPO Size ($m)"]
+        cantor_like_data.columns = columns
+        df_to_return = cantor_like_data
+
+        spac_price_data = self.get_historical_prices(board, look_back=look_back)
+        for row in df_to_return.iterrows():
+            issuer_name = row[1]["Issuer Name"]
+            try:
+                index = spac_price_data[issuer_name].first_valid_index()
+                if index is None:
+                    df_to_return.loc[df_to_return["Issuer Name"] == issuer_name, "Previous Closing Price"] = None
+                else:
+                    df_to_return.loc[df_to_return["Issuer Name"] == issuer_name, "Previous Closing Price"] = \
+                        float(spac_price_data[issuer_name][index])
+            except KeyError:
+                df_to_return.loc[df_to_return["Issuer Name"] == issuer_name, "Previous Closing Price"] = None
+
+        df_to_return = df_to_return.loc[df_to_return["Previous Closing Price"] > 8]
+        df_to_return = df_to_return[~df_to_return['Previous Closing Price'].isnull()]
+        return df_to_return.reset_index(drop=True)
