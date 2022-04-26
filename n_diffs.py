@@ -125,13 +125,11 @@ class NDiffs:
                 blank_df = pd.concat([blank_df, top_n_spacs])
 
         blank_df.set_index("Date", inplace=True)
-        print(blank_df)
         return blank_df
 
     @staticmethod
     def validate_enough_spacs_for_data(n: int) -> pd.DataFrame:
         blank_row = [['TEST', 'TEST', 0, 0, 0, datetime.date(1970, 1, 1), 0, 0, 0, 0, 0, 0]] * n
-        print(blank_row)
         blank_fields = pd.DataFrame(data=blank_row,
                                     columns=['Issuer Name', 'Common Ticker', 'Remaining Life (months)',
                                              'Previous Closing Price', 'Cash per Share in Trust', 'Redeem Date',
