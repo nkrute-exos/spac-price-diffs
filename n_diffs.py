@@ -47,7 +47,7 @@ class NDiffs:
                                        * (spac_data["Cash per Share in Trust"] - spac_data["Previous Closing Price"])
         return spac_data
 
-    def rank_by_diff_and_month(self, dataset: pd.DataFrame, n: int, month_year_cutoff: str = "1/1/1970"):
+    def rank_by_diff_and_month(self, dataset: pd.DataFrame, n: int):
         sorted_data = dataset.sort_values(by=["Exp Date Year", "Exp Date Month", "Profit Per 100K"],
                                           ascending=[True, True, False])
         sorted_data = sorted_data.groupby('Redeem Date').head(n)
@@ -55,9 +55,9 @@ class NDiffs:
                                    "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported",
                                    "IPO Size ($m)", "Profit Per 100K"]]
 
-        month_year_cutoff_obj = datetime.datetime.strptime(month_year_cutoff, "%m-%Y")
-        sorted_data["Redeem Date"] = pd.to_datetime(sorted_data["Redeem Date"], format="%m-%Y")
-        sorted_data = sorted_data[sorted_data["Redeem Date"] > month_year_cutoff_obj]
+        # month_year_cutoff_obj = datetime.datetime.strptime(month_year_cutoff, "%m-%Y")
+        # sorted_data["Redeem Date"] = pd.to_datetime(sorted_data["Redeem Date"], format="%m-%Y")
+        # sorted_data = sorted_data[sorted_data["Redeem Date"] > month_year_cutoff_obj]
         sorted_data = sorted_data.set_index(sorted_data["Redeem Date"])
         sorted_data.index.name = "Index Date"
         self.find_shares_and_price(sorted_data)
@@ -101,35 +101,44 @@ class NDiffs:
         dataset["PnL"] = (dataset["Cash per Share in Trust"] - dataset["Previous Closing Price"]) \
                          * dataset["Number of Shares"]
 
-    def only_keep_top_n_spacs(self, dataset: pd.DataFrame, n: int) -> pd.DataFrame:
-        rows_to_keep = [0] * n
-        greatest_prices = [-99] * n
-        greatest_price_rows = []
-        for count, row in enumerate(dataset.iterrows(), start=1):
-            current_price = float(row[1]["PnL"])
-            if current_price >= greatest_prices[0]:
-                greatest_prices[0] = float(current_price)
-                rows_to_keep[0] = row[1].values
-                try:
-                    greatest_prices, rows_to_keep = zip(*sorted(zip(greatest_prices, rows_to_keep)))
-                except ValueError:
-                    continue
-                greatest_prices = list(greatest_prices)
-                rows_to_keep = list(rows_to_keep)
+    def keep_top_n_spacs_via_lookback(self, dataset: pd.DataFrame, n: int, start_date: str) -> pd.DataFrame:
+        max_date = max(dataset["Redeem Date"])
+        start_date_obj = datetime.datetime.strptime(start_date, "%m/%d/%Y")
+        dataset["Redeem Date"] = pd.to_datetime(dataset["Redeem Date"], format="%m-%d-%Y")
+        date_range = pd.date_range(start=start_date_obj, end=max_date, freq="MS")
+        blank_df = pd.DataFrame(columns=['Issuer Name', 'Common Ticker', 'Remaining Life (months)',
+                                         'Previous Closing Price', 'Cash per Share in Trust', 'Redeem Date',
+                                         'Ann. YTM - Last Reported', 'IPO Size ($m)', 'Profit Per 100K',
+                                         'Number of Shares', 'PnL', 'Date'])
+        for date in date_range:
+            sorted_data = dataset[dataset["Redeem Date"] <= date].reset_index(drop=True)
+            data_no_zero_columns = sorted_data[sorted_data["Issuer Name"] != 0]
+            data_no_zero_columns = data_no_zero_columns.sort_values(by=["Profit Per 100K"], ascending=[False])
+            top_n_spacs = data_no_zero_columns[0:n].reset_index(drop=True)
+            top_n_spacs["Date"] = date
+            if len(top_n_spacs) < n:
+                print("Date", date, "doesn't have enough spacs")
+                blank_fields = self.validate_enough_spacs_for_data(n)
+                blank_fields["Date"] = date
+                blank_df = pd.concat([blank_df, blank_fields])
+            else:
+                blank_df = pd.concat([blank_df, top_n_spacs])
 
-            if count % n == 0:
-                greatest_price_rows.append(copy.deepcopy(rows_to_keep))
+        blank_df.set_index("Date", inplace=True)
+        print(blank_df)
+        return blank_df
 
-        df_highest_prices_repeated = pd.DataFrame(np.row_stack(greatest_price_rows))
-        df_highest_prices_repeated.columns = ["Issuer Name", "Common Ticker", "Remaining Life (months)",
-                                              "Previous Closing Price", "Cash per Share in Trust", "Redeem Date",
-                                              "Ann. YTM - Last Reported", "IPO Size ($m)", "Profit Per 100K",
-                                              "Number of Shares",
-                                              "PnL"]
-        date_index = self.generate_index(dataset.index[0], dataset.index[-1], n)
-        df_highest_prices_repeated["Date"] = date_index[0:len(df_highest_prices_repeated.index)]
-        df_highest_prices_repeated.set_index("Date", inplace=True)
-        return df_highest_prices_repeated
+    @staticmethod
+    def validate_enough_spacs_for_data(n: int) -> pd.DataFrame:
+        blank_row = [['TEST', 'TEST', 0, 0, 0, datetime.date(1970, 1, 1), 0, 0, 0, 0, 0, 0]] * n
+        print(blank_row)
+        blank_fields = pd.DataFrame(data=blank_row,
+                                    columns=['Issuer Name', 'Common Ticker', 'Remaining Life (months)',
+                                             'Previous Closing Price', 'Cash per Share in Trust', 'Redeem Date',
+                                             'Ann. YTM - Last Reported', 'IPO Size ($m)', 'Profit Per 100K',
+                                             'Number of Shares', 'PnL', 'Date'],
+                                    index=range(n))
+        return blank_fields
 
     def generate_single_row_from_top_n_spacs(self, dataset: pd.DataFrame, n: int) -> pd.DataFrame:
         single_rows = []

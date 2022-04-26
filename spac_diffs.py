@@ -1,3 +1,5 @@
+import datetime
+
 from n_diffs import NDiffs
 from outsideLiquidationDate import CDMData
 import pandas as pd
@@ -15,16 +17,17 @@ columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price", "Ca
 cdm_data_obj = CDMData()
 ndiffs = NDiffs()
 look_back = 5
-num_spacs = 3
+num_spacs = 8
 
 # CDM VERSION
 returned_spac_data = cdm_data_obj.get_spacs_from_dashboard(board="".join([ndiffs.file_path, "in_data/",
                                                                           "SPAC Dashboard.xlsx"]),
                                                            start_date="4/1/2022",
                                                            look_back=look_back)
+
 returned_spac_data = ndiffs.read_and_process_in_data_cdm(returned_spac_data)
-full_out = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs, month_year_cutoff="05-2022")
-highest_prices = ndiffs.only_keep_top_n_spacs(full_out, num_spacs)
+full_out = ndiffs.rank_by_diff_and_month(returned_spac_data, num_spacs)
+highest_prices = ndiffs.keep_top_n_spacs_via_lookback(full_out, start_date="6/1/2022", n=num_spacs)
 highest_prices = ndiffs.calc_number_of_shares_to_buy(highest_prices, amount_to_cover, num_spacs)
 date_check = ndiffs.validate_no_out_of_range_dates(highest_prices[columns_to_keep])
 final_date = list(amount_to_cover)[-1]
