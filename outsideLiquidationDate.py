@@ -1,5 +1,3 @@
-import datetime
-
 from cdm_metadata_client import Client
 from pandas.tseries.offsets import BDay
 import datetime as dt
@@ -32,7 +30,7 @@ class CDMData:
         use_date = today - BDay(1)
         t_f = use_date.strftime('%Y-%m-%d')
 
-        client = Client('www.kubepocdapi.aws.aurotfp.com/cdm-metadata-query-service')
+        client = Client('www.kubeprodapi.aws.aurotfp.com/cdm-metadata-query-service')
 
         spac_research = 'exos.tfp.spac_research.securities.typed.'
         record_spac_research = client.get_record(spac_research + t_f)
@@ -74,7 +72,7 @@ class CDMData:
         new_header = df.iloc[0]
         df = df[1:]
         df.columns = new_header
-        return df.loc[0: look_back]
+        return df.loc[2: 1+look_back].dropna(axis="columns")
 
     @staticmethod
     def get_yields(price_data: str) -> pd.DataFrame:

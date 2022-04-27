@@ -3,7 +3,6 @@
 import numpy as np
 import pandas as pd
 import datetime
-import copy
 from outsideLiquidationDate import CDMData
 
 
@@ -35,12 +34,9 @@ class NDiffs:
 
     @staticmethod
     def read_and_process_in_data_cdm(spac_data: pd.DataFrame) -> pd.DataFrame:
-        cdm_data = CDMData()
         spac_data.columns = NDiffs.headers
         spac_data = spac_data.reset_index(drop=True)
         spac_data["Redeem Date"] = pd.to_datetime(spac_data["Redeem Date"]) + pd.offsets.MonthBegin(1)
-        liquidation_data = cdm_data.get_liquidation_dates()
-        spac_data = cdm_data.update_redeem_dates(spac_data, liquidation_data)
         spac_data["Exp Date Year"] = spac_data["Redeem Date"].dt.strftime('%Y')
         spac_data["Exp Date Month"] = spac_data["Redeem Date"].dt.strftime('%m')
         spac_data["Profit Per 100K"] = (NDiffs.initial_investment / spac_data["Previous Closing Price"]) \
@@ -55,9 +51,6 @@ class NDiffs:
                                    "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported",
                                    "IPO Size ($m)", "Profit Per 100K"]]
 
-        # month_year_cutoff_obj = datetime.datetime.strptime(month_year_cutoff, "%m-%Y")
-        # sorted_data["Redeem Date"] = pd.to_datetime(sorted_data["Redeem Date"], format="%m-%Y")
-        # sorted_data = sorted_data[sorted_data["Redeem Date"] > month_year_cutoff_obj]
         sorted_data = sorted_data.set_index(sorted_data["Redeem Date"])
         sorted_data.index.name = "Index Date"
         self.find_shares_and_price(sorted_data)
@@ -137,6 +130,14 @@ class NDiffs:
                                              'Number of Shares', 'PnL', 'Date'],
                                     index=range(n))
         return blank_fields
+
+    @staticmethod
+    def add_average_price(dataset: pd.DataFrame, n: int) -> None:
+        dataset["Date"] = dataset.index
+        average_prices = dataset.groupby("Date")["Previous Closing Price"].mean()
+        average_cash_per_share = dataset.groupby("Date")["Cash per Share in Trust"].mean()
+        dataset["Avg PCP"] = list(np.repeat(average_prices, n))
+        dataset["Avg Cash/Share"] = list(np.repeat(average_cash_per_share, n))
 
     def generate_single_row_from_top_n_spacs(self, dataset: pd.DataFrame, n: int) -> pd.DataFrame:
         single_rows = []

@@ -15,7 +15,7 @@ columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price", "Ca
 cdm_data_obj = CDMData()
 ndiffs = NDiffs()
 look_back = 5
-num_spacs = 15
+num_spacs = 8
 
 # CDM VERSION
 returned_spac_data = cdm_data_obj.get_spacs_from_dashboard(board="".join([ndiffs.file_path, "in_data/",
