@@ -48,7 +48,6 @@ class CDMData:
         for row in liquidation_dates.iterrows():
             ticker = row[1]["rootSymbol"]
             liquid_date = pd.to_datetime(row[1]["outsideLiquidationDate"])
-            dataset.to_csv("/Users/nicholaskrute/Documents/SPAC_Price_by_diffs/out_data/data.csv")
             if ticker in dataset["Common Ticker"].values:
                 idx = np.where(dataset['Common Ticker'] == ticker)
                 dataset.loc[dataset.index == idx[0][0], "Redeem Date"] = liquid_date + pd.offsets.MonthBegin(1)
