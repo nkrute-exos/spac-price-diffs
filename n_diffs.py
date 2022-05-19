@@ -11,7 +11,7 @@ class NDiffs:
     headers = ["Issuer Name", "Common Ticker", "Remaining Life (months)",
                "Previous Closing Price", "Cash per Share in Trust",
                "Redeem Date", "Ann. YTM - Last Reported",
-               "IPO Size ($m)", "Avg Vol"]
+               "IPO Size ($m)", "Avg Vol", "Predicted Cash in Trust"]
     spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_",
                     "SPAC_Cash_in_Trust_", "SPAC_Redeem_Date_",
                     "SPAC_IPO_Size_", "SPAC_Num_Shares_"]
@@ -53,7 +53,7 @@ class NDiffs:
         sorted_data = sorted_data.groupby('Redeem Date').head(n)
         sorted_data = sorted_data[["Issuer Name", "Common Ticker", "Remaining Life (months)", "Previous Closing Price",
                                    "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported",
-                                   "IPO Size ($m)", "Profit Per 100K", "Avg Vol"]]
+                                   "IPO Size ($m)", "Predicted Cash in Trust", "Profit Per 100K", "Avg Vol"]]
 
         sorted_data = sorted_data.set_index(sorted_data["Redeem Date"])
         sorted_data.index.name = "Index Date"
@@ -64,7 +64,7 @@ class NDiffs:
         extra_rows = pd.DataFrame(0, index=np.arange(len(index_with_missing_dates) - len(sorted_data)),
                                   columns=["Issuer Name", "Common Ticker", "Remaining Life (months)",
                                            "Previous Closing Price", "Cash per Share in Trust", "Redeem Date",
-                                           "Ann. YTM - Last Reported", "IPO Size ($m)", "Profit Per 100K",
+                                           "Ann. YTM - Last Reported", "IPO Size ($m)", "Predicted Cash in Trust","Profit Per 100K",
                                            "Number of Shares", "PnL"])
         sorted_data = pd.concat([sorted_data, extra_rows], axis=0)
         fully_missing_dates = index_with_missing_dates.difference(sorted_data["Redeem Date"])

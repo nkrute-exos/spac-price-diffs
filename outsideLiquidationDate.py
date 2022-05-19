@@ -92,6 +92,7 @@ class CDMData:
         df_filtered.reset_index(inplace=True)
         cantor_like_data = df_filtered[['name', 'symbol', 'Days to Go2', 'Market Price', 'estimatedCashAtLiquidation',
                                         'endDate', 'outsideLiquidationDate', 'YTM']]
+        predicted_cash = self.calculate_future_cash_in_trust(df_filtered[['estimatedCashInTrustPerShare', 'Days to Go']])
         cantor_like_data["Exp Date"] = np.where(~df_filtered['outsideLiquidationDate'].isnull(),
                                                 df_filtered['outsideLiquidationDate'], df_filtered['endDate'])
         cantor_like_data["IPO Size ($m)"] = 0
@@ -121,15 +122,15 @@ class CDMData:
             except KeyError:
                 df_to_return.loc[df_to_return["Issuer Name"] == issuer_name, "Previous Closing Price"] = None
 
+        df_to_return["Predicted Cash in Trust"] = predicted_cash
         df_to_return = df_to_return.loc[df_to_return["Previous Closing Price"] > 8]
         df_to_return = df_to_return[~df_to_return['Previous Closing Price'].isnull()]
         return df_to_return.reset_index(drop=True)
 
     @staticmethod
     def calculate_future_cash_in_trust(dataset: pd.DataFrame) -> pd.DataFrame:
-        dataset["multiplier"] = dataset['Days to Go2'] / 360
-        dataset['extra_cash'] = .06 * dataset["multiplier"]
-        dataset['Predicted Cash'] = dataset['estimatedCashAtLiquidation'] + dataset['extra_cash']
+        dataset['extra_cash'] = .06 * dataset['Days to Go'] / 360
+        dataset['Predicted Cash'] = dataset['estimatedCashInTrustPerShare'] + dataset['extra_cash']
         return dataset['Predicted Cash']
 
     @staticmethod
