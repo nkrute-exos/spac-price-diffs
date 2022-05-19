@@ -12,7 +12,7 @@ class CDMData:
         today = dt.date.today()
         use_date = today - BDay(1)
         t_f = use_date.strftime('%Y-%m-%d')
-        client = Client('www.kubepocapi.aws.aurotfp.com/cdm-metadata-query-service')
+        client = Client('www.kubeprodapi.aws.aurotfp.com/cdm-metadata-query-service')
 
         spac_research = 'exos.tfp.spac_research.securities.typed.'
         record_spac_research = client.get_record(spac_research + t_f)
@@ -106,18 +106,36 @@ class CDMData:
         df_to_return = cantor_like_data
 
         spac_price_data = self.get_historical_prices(board, look_back=look_back)
+        spac_volume_data = self.get_volume(board, look_back=look_back)
         for row in df_to_return.iterrows():
             issuer_name = row[1]["Issuer Name"]
             try:
                 index = spac_price_data[issuer_name].first_valid_index()
+                volume = spac_volume_data[issuer_name]
                 if index is None:
                     df_to_return.loc[df_to_return["Issuer Name"] == issuer_name, "Previous Closing Price"] = None
                 else:
                     df_to_return.loc[df_to_return["Issuer Name"] == issuer_name, "Previous Closing Price"] = \
                         float(spac_price_data[issuer_name][index])
+                df_to_return.loc[df_to_return["Issuer Name"] == issuer_name, "Avg Volume"] = volume
             except KeyError:
                 df_to_return.loc[df_to_return["Issuer Name"] == issuer_name, "Previous Closing Price"] = None
 
         df_to_return = df_to_return.loc[df_to_return["Previous Closing Price"] > 8]
         df_to_return = df_to_return[~df_to_return['Previous Closing Price'].isnull()]
         return df_to_return.reset_index(drop=True)
+
+    @staticmethod
+    def calculate_future_cash_in_trust(dataset: pd.DataFrame) -> pd.DataFrame:
+        dataset["multiplier"] = dataset['Days to Go2'] / 360
+        dataset['extra_cash'] = .06 * dataset["multiplier"]
+        dataset['Predicted Cash'] = dataset['estimatedCashAtLiquidation'] + dataset['extra_cash']
+        return dataset['Predicted Cash']
+
+    @staticmethod
+    def get_volume(board: str, look_back: int = 5) -> pd.DataFrame:
+        df = pd.read_excel(board, sheet_name="spac_volume_data")
+        new_header = df.iloc[0]
+        df = df[1:]
+        df.columns = new_header
+        return df.loc[2: 1 + look_back].dropna(axis="columns").mean(axis=0)

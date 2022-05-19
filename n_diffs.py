@@ -8,9 +8,12 @@ from outsideLiquidationDate import CDMData
 
 class NDiffs:
     file_path = "/Users/nicholaskrute/Documents/SPAC_Price_by_diffs/"
-    headers = ["Issuer Name", "Common Ticker", "Remaining Life (months)", "Previous Closing Price",
-               "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported", "IPO Size ($m)"]
-    spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_", "SPAC_Cash_in_Trust_", "SPAC_Redeem_Date_",
+    headers = ["Issuer Name", "Common Ticker", "Remaining Life (months)",
+               "Previous Closing Price", "Cash per Share in Trust",
+               "Redeem Date", "Ann. YTM - Last Reported",
+               "IPO Size ($m)", "Avg Vol"]
+    spac_headers = ["SPAC_Issuer_", "SPAC_Ticker_", "SPAC_Price_",
+                    "SPAC_Cash_in_Trust_", "SPAC_Redeem_Date_",
                     "SPAC_IPO_Size_", "SPAC_Num_Shares_"]
     start_date = pd.to_datetime("5/1/2022")  # taken from the original doc in sheet2
     end_date = pd.to_datetime("5/1/2025")
@@ -23,7 +26,8 @@ class NDiffs:
         spac_data = spac_data.iloc[6:, 1:]  # want to figure out how to replace this
         spac_data.columns = NDiffs.headers
         spac_data = spac_data.reset_index(drop=True)
-        spac_data["Redeem Date"] = pd.to_datetime(spac_data["Redeem Date"]) + pd.offsets.MonthBegin(1)
+        spac_data["Redeem Date"] = pd.to_datetime(spac_data["Redeem Date"]) + \
+                                   pd.offsets.MonthBegin(1)
         liquidation_data = cdm_data.get_liquidation_dates()
         spac_data = cdm_data.update_redeem_dates(spac_data, liquidation_data)
         spac_data["Exp Date Year"] = spac_data["Redeem Date"].dt.strftime('%Y')
@@ -49,7 +53,7 @@ class NDiffs:
         sorted_data = sorted_data.groupby('Redeem Date').head(n)
         sorted_data = sorted_data[["Issuer Name", "Common Ticker", "Remaining Life (months)", "Previous Closing Price",
                                    "Cash per Share in Trust", "Redeem Date", "Ann. YTM - Last Reported",
-                                   "IPO Size ($m)", "Profit Per 100K"]]
+                                   "IPO Size ($m)", "Profit Per 100K", "Avg Vol"]]
 
         sorted_data = sorted_data.set_index(sorted_data["Redeem Date"])
         sorted_data.index.name = "Index Date"
@@ -122,7 +126,7 @@ class NDiffs:
 
     @staticmethod
     def validate_enough_spacs_for_data(n: int) -> pd.DataFrame:
-        blank_row = [['TEST', 'TEST', 0, 0, 0, datetime.date(1970, 1, 1), 0, 0, 0, 0, 0, 0]] * n
+        blank_row = [['NONE', 'NONE', 0, 0, 0, datetime.date(1970, 1, 1), 0, 0, 0, 0, 0, 0]] * n
         blank_fields = pd.DataFrame(data=blank_row,
                                     columns=['Issuer Name', 'Common Ticker', 'Remaining Life (months)',
                                              'Previous Closing Price', 'Cash per Share in Trust', 'Redeem Date',
