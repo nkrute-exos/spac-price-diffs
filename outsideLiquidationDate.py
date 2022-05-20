@@ -140,3 +140,15 @@ class CDMData:
         df = df[1:]
         df.columns = new_header
         return df.loc[2: 1 + look_back].dropna(axis="columns").mean(axis=0)
+    
+        @staticmethod
+    def get_draw_schedule(board: str) -> dict[str, float]:
+        df = pd.read_excel(board, sheet_name="Scheduled SPAC Monthly")
+        new_header = df.iloc[3]
+        df = df[4:]
+        df.columns = new_header
+        df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%m/%d/%y')
+        df_filtered = df.reset_index(drop=True)[['Date', 'Amount']]
+        list_form = df_filtered.to_dict('split')['data']
+        to_cover = {k: v for k, v in dict(list_form).items() if v}
+        return to_cover
