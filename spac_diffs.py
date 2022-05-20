@@ -1,20 +1,6 @@
 from n_diffs import NDiffs
 from outsideLiquidationDate import CDMData
 import pandas as pd
-import datetime
-
-amount_to_cover = {"9/1/22": 3448148.15, "10/1/22": 4187037.04,
-                   "11/1/22": 4187037.04, "12/1/22": 4187037.04,
-                   "1/1/23": 4187037.04, "2/1/23": 4187037.04,
-                   "3/1/23": 4187037.04, "4/1/23": 4187037.04,
-                   "5/1/23": 4187037.04, "6/1/23": 4187037.04,
-                   "7/1/23": 4187037.04, "8/1/23": 4187037.04,
-                   "9/1/23": 4187037.04, "10/1/23": 4187037.04,
-                   "11/1/23": 4187037.04, "12/1/23": 4187037.04,
-                   "1/1/24": 4187037.04, "2/1/24": 4187037.04,
-                   "3/1/24": 4187037.04, "4/1/24": 4187037.04,
-                   "5/1/24": 4187037.04, "6/1/24": 4187037.04,
-                   "7/1/24": 4187037.04, "8/1/24": 4187037.04}
 
 columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price",
                    "Cash per Share in Trust", "Predicted Cash in Trust", "Redeem Date",
@@ -27,6 +13,8 @@ num_spacs = 5
 volume_filter = 0
 
 # CDM VERSION
+amount_to_cover = cdm_data_obj.get_draw_schedule(board="".join([ndiffs.file_path, "results/",
+                                              "A Note Securitization SPACS - Hanover copy.xlsx"]))
 returned_spac_data = cdm_data_obj.get_spacs_from_dashboard(board="".join([ndiffs.file_path, "in_data/",
                                                                           "SPAC Dashboard.xlsx"]),
                                                            start_date="4/1/2022",
