@@ -141,7 +141,7 @@ class CDMData:
         df.columns = new_header
         return df.loc[2: 1 + look_back].dropna(axis="columns").mean(axis=0)
     
-        @staticmethod
+    @staticmethod
     def get_draw_schedule(board: str) -> dict[str, float]:
         df = pd.read_excel(board, sheet_name="Scheduled SPAC Monthly")
         new_header = df.iloc[3]

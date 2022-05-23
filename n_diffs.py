@@ -60,8 +60,10 @@ class NDiffs:
         self.find_shares_and_price(sorted_data)
         len_sorted_data = len(sorted_data)
         index_with_missing_dates = self.generate_index(start_date=sorted_data["Redeem Date"].iloc[0],
-                                                       end_date=sorted_data["Redeem Date"].iloc[-1], n=n)
-        extra_rows = pd.DataFrame(0, index=np.arange(len(index_with_missing_dates) - len(sorted_data)),
+                                                       end_date=sorted_data["Redeem Date"].iloc[-1],
+                                                       n=n)
+        extra_rows = pd.DataFrame(0,
+                                  index=np.arange(len(index_with_missing_dates) - len(sorted_data)),
                                   columns=["Issuer Name", "Common Ticker", "Remaining Life (months)",
                                            "Previous Closing Price", "Cash per Share in Trust", "Redeem Date",
                                            "Ann. YTM - Last Reported", "IPO Size ($m)", "Predicted Cash in Trust","Profit Per 100K",
