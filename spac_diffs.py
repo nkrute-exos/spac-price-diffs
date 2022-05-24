@@ -3,6 +3,7 @@ from outsideLiquidationDate import CDMData
 from draw_models import LinearDrawsLoan, NormalDistributionLoan
 import pandas as pd
 import datetime
+from excel_sheet import ExcelSheet
 
 columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price",
                    "Cash per Share in Trust", "Predicted Cash in Trust", "Redeem Date",
@@ -11,11 +12,8 @@ columns_to_keep = ["Issuer Name", "Common Ticker", "Previous Closing Price",
 ndiffs = NDiffs()
 cdm_data_obj = CDMData()
 look_back = 5
-num_spacs = 8
+num_spacs = 2
 volume_filter = 0
-
-# CDM VERSION
-# amount_to_cover = cdm_data_obj.get_draw_schedule(board="".join([ndiffs.file_path, "results/", "A Note Securitization SPACS - Hanover copy.xlsx"]))
 
 linear_draws = NormalDistributionLoan(loan_amount=99750000,
                                       draw_percent=.15,
@@ -23,8 +21,6 @@ linear_draws = NormalDistributionLoan(loan_amount=99750000,
                                       start_date=datetime.date(2022, 9, 1),
                                       end_date=datetime.date(2024, 8, 1))
 amount_to_cover = linear_draws.calculate_draws()
-print(amount_to_cover.values())
-print(sum(amount_to_cover.values()))
 
 returned_spac_data = cdm_data_obj.get_spacs_from_dashboard(board="".join([ndiffs.file_path, "in_data/",
                                                                           "SPAC Dashboard.xlsx"]),
@@ -59,3 +55,4 @@ else:
                                          "full_out.csv"]))
     ndiffs.write_data(extended_data, "".join([ndiffs.file_path, "out_data/",
                                               "ranked_data.csv"]))
+

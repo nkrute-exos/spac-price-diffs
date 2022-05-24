@@ -152,3 +152,4 @@ class CDMData:
         list_form = df_filtered.to_dict('split')['data']
         to_cover = {k: v for k, v in dict(list_form).items() if v}
         return to_cover
+
