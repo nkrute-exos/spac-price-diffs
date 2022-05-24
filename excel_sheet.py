@@ -1,8 +1,8 @@
 import pandas as pd
-import numpy_financial as npf
 import datetime
 from draw_models import NormalDistributionLoan, LinearDrawsLoan
 from typing import Any
+from pyxirr import xirr
 
 
 class ExcelSheet:
@@ -10,9 +10,6 @@ class ExcelSheet:
     def build_empty_excel_sheet(amount_to_cover: Any,
                                 start_date: datetime.date,
                                 end_date: datetime.date) -> pd.DataFrame:
-        # columns = ["Date", "Amount", "Redeem Date", "Weighted Avg. Price",
-        #            "Avg. Trust per Share", "# Shares", "MV", "Prem", "Port CF",
-        #            "Port Prin", "Port Prem"]
         columns = ["Date"]
 
         date_range = pd.date_range(start=start_date, end=end_date, freq="MS")
@@ -49,7 +46,7 @@ class ExcelSheet:
     def get_avg_trust_per_share(ranked_data: pd.DataFrame, sheet: pd.DataFrame) -> pd.DataFrame:
         sheet["Avg. Trust per Share"] = 0
         price_dict = dict(
-            ranked_data.groupby("Unnamed: 0")["Cash per Share in Trust"].mean())
+            ranked_data.groupby("Unnamed: 0")["Predicted Cash in Trust"].mean())
         for date, price in price_dict.items():
             date = pd.to_datetime(date) + pd.DateOffset(months=1)
             sheet.loc[sheet["Date"] == date, "Avg. Trust per Share"] = price
@@ -100,9 +97,9 @@ class ExcelSheet:
         return sheet
 
     @staticmethod
-    def xirr(sheet: pd.DataFrame) -> float:
-        irr = npf.irr(sheet["Port CF"])
-        return irr
+    def percent_return(sheet: pd.DataFrame) -> float:
+        percent = xirr(sheet[["Date", "Port CF"]])
+        return percent
 
 linear_draws = NormalDistributionLoan(loan_amount=99750000,
                                       draw_percent=.15,
@@ -125,7 +122,8 @@ empty_df = empty_df.fillna(0)
 empty_df = sheet.get_port_prin(sheet=empty_df)
 empty_df = sheet.get_port_prem(sheet=empty_df)
 empty_df = sheet.get_port_cf(sheet=empty_df)
-irr = sheet.xirr(sheet=empty_df)
+irr = sheet.percent_return(sheet=empty_df)
 
-print("IRR =", irr)
-
+#with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+#    print(empty_df)
+print("IRR =", round(irr*100, 2))
